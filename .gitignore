@@ -1,0 +1,11 @@
+.venv/
+.pytest_cache/
+__pycache__/
+.python-version
+test-claude-config.json
+test-memories/
+data/
+logs/
+*.log
+*.mitm
+ORACLE_*.md

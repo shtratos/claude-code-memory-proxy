@@ -123,6 +123,90 @@ def transform_tool_uses(payload: Any, transformer: Callable[[str], str]) -> None
             transform_tool_uses(item, transformer)
 
 
+# --- System Prompt Patching ---
+
+_system_prompt_patches_cache: list[dict] | None = None
+
+
+def load_system_prompt_patches() -> list[dict]:
+    """Load patches from config file specified by SYSTEM_PROMPT_PATCHES env var.
+
+    Config format:
+    {
+      "replacements": [
+        {"find": "...", "replace": "...", "required": true/false},
+        ...
+      ]
+    }
+    """
+    global _system_prompt_patches_cache
+    if _system_prompt_patches_cache is not None:
+        return _system_prompt_patches_cache
+
+    path = os.environ.get("SYSTEM_PROMPT_PATCHES")
+    if not path:
+        _system_prompt_patches_cache = []
+        return _system_prompt_patches_cache
+
+    if not os.path.exists(path):
+        logger.warning("SYSTEM_PROMPT_PATCHES file not found: %s", path)
+        _system_prompt_patches_cache = []
+        return _system_prompt_patches_cache
+
+    try:
+        with open(path) as f:
+            config = json.load(f)
+        _system_prompt_patches_cache = config.get("replacements", [])
+        logger.info("Loaded %d system prompt patches from %s", len(_system_prompt_patches_cache), path)
+    except (json.JSONDecodeError, IOError) as exc:
+        logger.error("Failed to load system prompt patches from %s: %s", path, exc)
+        _system_prompt_patches_cache = []
+
+    return _system_prompt_patches_cache
+
+
+def transform_system_prompt(payload: MutableMapping[str, Any]) -> None:
+    """Apply configured patches to system prompt blocks.
+
+    Raises HTTPException if a required patch fails to match.
+    """
+    patches = load_system_prompt_patches()
+    if not patches:
+        return
+
+    system = payload.get("system")
+    if not isinstance(system, list):
+        return
+
+    applied_count = 0
+    for patch in patches:
+        find_str = patch.get("find", "")
+        replace_str = patch.get("replace", "")
+        required = patch.get("required", False)
+
+        if not find_str:
+            continue
+
+        found = False
+        for block in system:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text = block.get("text", "")
+                if find_str in text:
+                    found = True
+                    block["text"] = text.replace(find_str, replace_str)
+                    applied_count += 1
+
+        if required and not found:
+            logger.error("Required system prompt patch failed to match: %s", find_str[:80])
+            raise HTTPException(
+                status_code=500,
+                detail=f"Required system prompt patch failed: {find_str[:50]}..."
+            )
+
+    if applied_count > 0:
+        logger.info("Applied %d system prompt patches", applied_count)
+
+
 async def read_json_response(upstream: httpx.Response) -> JSONResponse:
     content = await upstream.aread()
     text = content.decode(upstream.encoding or "utf-8")
@@ -222,6 +306,9 @@ async def proxy_messages(request: Request, client: HttpClient = Depends(get_clie
         payload = await request.json()
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=400, detail=f"Invalid JSON request: {exc}") from exc
+
+    # Apply system prompt patches (identity reframing, etc.)
+    transform_system_prompt(payload)
 
     if "tools" in payload and isinstance(payload["tools"], list):
         rewrite_tools_for_upstream(payload["tools"])

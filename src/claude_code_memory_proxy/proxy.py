@@ -404,8 +404,9 @@ def create_app() -> FastAPI:
 def main() -> None:
     import uvicorn
 
+    host = os.environ.get("PROXY_HOST", "127.0.0.1")
     port = int(os.environ.get("PROXY_PORT", "15041"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":

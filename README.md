@@ -173,6 +173,7 @@ All helper scripts respect `HTTP(S)_PROXY` so they can be routed through mitmpro
 | --- | --- | --- |
 | `MEMORY_DIR` | `./memories` | Root directory for stored memories |
 | `UPSTREAM_API_URL` | `https://api.anthropic.com` | Base URL for the Anthropic API |
+| `PROXY_HOST` | `127.0.0.1` | Host address the proxy binds to (use `0.0.0.0` for external access) |
 | `PROXY_PORT` | `15041` | Port the proxy listens on |
 | `ANTHROPIC_API_KEY` | (none) | Passed through to upstream requests as `x-api-key` |
 | `ANTHROPIC_BETA` | `context-management-2025-06-27` | Comma-merged into the `anthropic-beta` header (case-insensitive) |

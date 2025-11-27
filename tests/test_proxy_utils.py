@@ -320,15 +320,29 @@ def test_transform_system_prompt_non_list_system() -> None:
         
         # Should not modify string system prompt
         assert payload["system"] == "This is old text."
-        
-        # Reset cache for second test
-        proxy._system_prompt_patches_cache = None
+    finally:
+        os.environ.pop("SYSTEM_PROMPT_PATCHES", None)
+        os.unlink(config_path)
+
+
+def test_transform_system_prompt_no_system_key() -> None:
+    """Test that missing system key is handled gracefully."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        json.dump({
+            "replacements": [
+                {"find": "old", "replace": "new", "required": False}
+            ]
+        }, f)
+        config_path = f.name
+    
+    try:
+        os.environ["SYSTEM_PROMPT_PATCHES"] = config_path
         
         # No system key at all
-        payload_no_system = {"messages": []}
+        payload_no_system: dict = {"messages": []}
         proxy.transform_system_prompt(payload_no_system)
         
-        # Should not raise
+        # Should not raise and should not add system key
         assert "system" not in payload_no_system
     finally:
         os.environ.pop("SYSTEM_PROMPT_PATCHES", None)

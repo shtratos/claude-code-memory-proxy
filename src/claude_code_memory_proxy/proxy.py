@@ -168,7 +168,8 @@ def load_system_prompt_patches() -> list[dict]:
 def transform_system_prompt(payload: MutableMapping[str, Any]) -> None:
     """Apply configured patches to system prompt blocks.
 
-    Raises HTTPException if a required patch fails to match.
+    Skips patching for Claude Agent SDK requests (background agents).
+    Raises HTTPException if a required patch fails to match on Claude Code requests.
     """
     patches = load_system_prompt_patches()
     if not patches:
@@ -177,6 +178,15 @@ def transform_system_prompt(payload: MutableMapping[str, Any]) -> None:
     system = payload.get("system")
     if not isinstance(system, list):
         return
+
+    # Check if this is a Claude Agent SDK request (background agents)
+    # These have a different identity and should not be patched
+    for block in system:
+        if isinstance(block, dict) and block.get("type") == "text":
+            text = block.get("text", "")
+            if "You are a Claude agent, built on Anthropic's Claude Agent SDK" in text:
+                logger.debug("Skipping patches for Claude Agent SDK request")
+                return
 
     applied_count = 0
     for patch in patches:

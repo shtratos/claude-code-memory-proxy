@@ -173,14 +173,63 @@ All helper scripts respect `HTTP(S)_PROXY` so they can be routed through mitmpro
 | --- | --- | --- |
 | `MEMORY_DIR` | `./memories` | Root directory for stored memories |
 | `UPSTREAM_API_URL` | `https://api.anthropic.com` | Base URL for the Anthropic API |
+| `PROXY_HOST` | `127.0.0.1` | Host address the proxy binds to |
 | `PROXY_PORT` | `15041` | Port the proxy listens on |
 | `ANTHROPIC_API_KEY` | (none) | Passed through to upstream requests as `x-api-key` |
 | `ANTHROPIC_BETA` | `context-management-2025-06-27` | Comma-merged into the `anthropic-beta` header (case-insensitive) |
 | `CLAUDE_MODEL` | `claude-sonnet-4-5` | Default model used in helper scripts |
+| `SYSTEM_PROMPT_PATCHES` | (none) | Path to a JSON file containing system prompt patches (see below) |
 
 Both tool prefixes (`mcp__memory__memory_20250818` and `memory__memory_20250818`) are accepted by the proxy and rewritten to the upstream-native `{"name": "memory", "type": "memory_20250818"}` format.
 
 The proxy forwards all headers except hop-by-hop headers (e.g., `host`, `content-length`, `connection`). Token and tracing headers set by the client are preserved.
+
+### System Prompt Patching
+
+The proxy supports modifying system prompt content before forwarding requests upstream. This is useful for customizing Claude's behavior or injecting context.
+
+To enable system prompt patching, set `SYSTEM_PROMPT_PATCHES` to the path of a JSON configuration file:
+
+```bash
+SYSTEM_PROMPT_PATCHES=/path/to/patches.json uv run memory-proxy
+```
+
+**Configuration Format:**
+
+The JSON file must contain a `replacements` array, where each entry specifies a find/replace operation:
+
+```json
+{
+  "replacements": [
+    {
+      "find": "text to find in system prompt",
+      "replace": "replacement text",
+      "required": false
+    },
+    {
+      "find": "another pattern",
+      "replace": "another replacement",
+      "required": true
+    }
+  ]
+}
+```
+
+**Fields:**
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `find` | string | The text pattern to search for in system prompt blocks |
+| `replace` | string | The text to replace matches with |
+| `required` | boolean | If `true`, the request fails with HTTP 500 if the pattern is not found |
+
+**Behavior:**
+
+- Patches are applied to all text blocks in the system prompt array
+- Each patch performs a simple string replacement (not regex)
+- If `required` is `true` and the `find` pattern is not present in any system prompt block, the proxy returns an HTTP 500 error
+- If `required` is `false` (default), missing patterns are silently ignored
+- Patches are applied in the order they appear in the configuration
 
 ---
 

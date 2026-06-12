@@ -139,6 +139,18 @@ def test_read_json_response_strips_content_encoding() -> None:
     assert updated_payload["content"][0]["name"] == "mcp__memory__memory_20250818"
 
 
+def test_http_client_allows_long_running_upstream_requests() -> None:
+    client = proxy.HttpClient("http://upstream")
+    try:
+        timeout = client._client.timeout
+        assert timeout.connect >= 30
+        assert timeout.read >= 900
+        assert timeout.write >= 900
+        assert timeout.pool >= 900
+    finally:
+        anyio.run(client.close)
+
+
 # --- System Prompt Patching Tests ---
 
 

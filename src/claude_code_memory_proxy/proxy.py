@@ -273,7 +273,7 @@ class HttpClient:
     def __init__(self, base_url: str) -> None:
         self._client = httpx.AsyncClient(
             base_url=base_url,
-            timeout=httpx.Timeout(60.0, connect=10.0, read=120.0),
+            timeout=httpx.Timeout(900.0, connect=30.0, read=900.0),
         )
 
     async def close(self) -> None:
